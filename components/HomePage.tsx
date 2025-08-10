@@ -54,7 +54,15 @@ const HomePage: React.FC<HomePageProps> = ({ songs, trendingSongs, onSongPlay, f
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
           <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Loading your music...</p>
-          <p className={`text-xs mt-2 ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>This may take a moment</p>
+          <p className={`text-xs mt-2 ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>Connecting to database...</p>
+          <div className="mt-4">
+            <button 
+              onClick={() => window.location.reload()} 
+              className="text-purple-400 hover:text-purple-300 text-sm underline"
+            >
+              Having trouble? Click to retry
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -68,13 +76,18 @@ const HomePage: React.FC<HomePageProps> = ({ songs, trendingSongs, onSongPlay, f
           <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4">
             <Music size={32} className="text-white" />
           </div>
-          <h3 className="text-xl font-semibold mb-2">No music available</h3>
-          <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Please check your connection and try again</p>
+          <h3 className="text-xl font-semibold mb-2">Unable to load music</h3>
+          <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'} className="mb-2">
+            There might be a connection issue with the database
+          </p>
+          <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-500'} mb-4`}>
+            Check the console for more details
+          </p>
           <button 
             onClick={() => window.location.reload()} 
             className="mt-4 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors"
           >
-            Retry
+            Reload App
           </button>
         </div>
       </div>

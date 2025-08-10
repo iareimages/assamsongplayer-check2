@@ -192,15 +192,27 @@ export function useSupabaseData() {
       setLoading(true)
       console.log('Fetching all songs from supabase...');
       
-      // Add timeout to prevent hanging
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Request timeout')), 10000)
-      );
+      // Test connection first
+      console.log('🔗 Testing Supabase connection...');
+      const { data: testData, error: testError } = await supabase
+        .from('songs')
+        .select('count')
+        .limit(1)
+        .single()
       
+      if (testError) {
+        console.error('❌ Supabase connection test failed:', testError);
+        throw new Error(`Database connection failed: ${testError.message}`);
+      }
+      
+      console.log('✅ Supabase connection successful');
+      
+      // Fetch songs with simpler query first
+      console.log('📊 Fetching songs data...');
       const { data: songsData, error } = await supabase
         .from('songs')
         .select('*')
-        .order('views', { ascending: false })
+        .limit(100) // Start with a smaller limit
         
       if (error) throw error
       
@@ -219,6 +231,7 @@ export function useSupabaseData() {
       songsCache.current = songsData;
 
       // Fetch liked songs
+      console.log('❤️ Fetching liked songs...');
       let userLikedSongs = new Set<number>()
       const { data: likedData } = await supabase
         .from('liked_songs')
@@ -233,11 +246,13 @@ export function useSupabaseData() {
       console.log('✅ Fetched liked songs:', userLikedSongs.size);
 
       // Fetch user history (for minutes_listened)
+      console.log('📈 Fetching user history...');
       const { data: historyData, error: historyError } = await supabase
         .from('history')
         .select('song_id, minutes_listened, songs(*)')
         .eq('user_id', userId)
         .order('minutes_listened', { ascending: false })
+        .limit(50) // Limit history to prevent large queries
       if (historyError) {
         console.warn('⚠️ Error fetching history:', historyError);
         // Don't throw, continue without history
@@ -317,6 +332,7 @@ export function useSupabaseData() {
       console.log('✅ Set trending songs:', trending.length);
 
       // Set last played song as before
+      console.log('🎵 Setting last played song...');
       const { data: userData } = await supabase
         .from('users')
         .select('last_song_file_id')
@@ -333,6 +349,14 @@ export function useSupabaseData() {
       console.log('🎉 Successfully loaded all data!');
     } catch (error) {
       console.error('❌ Error fetching songs:', error)
+      
+      // Show user-friendly error message
+      if (error.message?.includes('connection') || error.message?.includes('timeout')) {
+        console.error('🌐 Connection issue detected');
+      } else if (error.message?.includes('permission') || error.message?.includes('auth')) {
+        console.error('🔐 Authentication issue detected');
+      }
+      
       setSongs([])
       setPersonalizedSongs([])
       setTrendingSongs([])
@@ -497,7 +521,7 @@ export function useSupabaseData() {
         `)
         .eq('user_id', userId)
         .order('minutes_listened', { ascending: false })
-        .limit(9)
+        .limit(15) // Increase limit slightly
 
       if (historyError) {
         console.warn('⚠️ Error fetching recently played:', historyError)
@@ -558,6 +582,7 @@ export function useSupabaseData() {
           )
         `)
         .eq('user_id', userId)
+        .limit(20) // Limit playlists to prevent large queries
 
       if (error) {
         console.warn('⚠️ Error fetching playlists:', error);
@@ -914,17 +939,35 @@ export function useSupabaseData() {
     const userId = getUserId()
     console.log('👤 Current userId in useEffect:', userId)
     if (userId) {
-      const loadData = async () => {
+      const loadDataWithRetry = async (retryCount = 0) => {
         try {
           console.log('📊 Loading data for user:', userId)
-          // Load songs first, then other data
+          console.log(`🔄 Attempt ${retryCount + 1}/3`);
+          
+          // Load songs first (most important)
           await fetchSongs()
-          await Promise.all([fetchPlaylists(), fetchRecentlyPlayed()])
+          
+          // Then load other data
+          console.log('📊 Loading additional data...');
+          await fetchPlaylists()
+          await fetchRecentlyPlayed()
+          
+          console.log('🎉 All data loaded successfully!');
         } catch (error) {
           console.error('❌ Error loading data:', error)
+          
+          // Retry up to 3 times with exponential backoff
+          if (retryCount < 2) {
+            const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s
+            console.log(`⏳ Retrying in ${delay}ms...`);
+            setTimeout(() => loadDataWithRetry(retryCount + 1), delay);
+          } else {
+            console.error('❌ Failed to load data after 3 attempts');
+            setLoading(false);
+          }
         }
       }
-      loadData()
+      loadDataWithRetry()
     } else {
       console.log('🚫 No user found, resetting data')
       // Reset data when no user
